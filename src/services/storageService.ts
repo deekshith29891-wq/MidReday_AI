@@ -2,11 +2,11 @@ import { StudentProfile, TopicConfidenceRecord, ReadinessOverview, SmartNoteItem
 import { DEFAULT_STUDENT_PROFILE, INITIAL_TOPIC_CONFIDENCE, INITIAL_READINESS_OVERVIEW } from '../data/defaultStudent';
 
 const STORAGE_KEYS = {
-  PROFILE: 'medready_student_profile',
-  CONFIDENCE: 'medready_topic_confidence',
-  READINESS: 'medready_readiness_overview',
-  NOTES: 'medready_smart_notes',
-  RECENT_VIVA: 'medready_recent_viva_sessions',
+  PROFILE: 'medready_v2_student_profile',
+  CONFIDENCE: 'medready_v2_topic_confidence',
+  READINESS: 'medready_v2_readiness_overview',
+  NOTES: 'medready_v2_smart_notes',
+  RECENT_VIVA: 'medready_v2_recent_viva_sessions',
 };
 
 export class StorageService {

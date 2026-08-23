@@ -23,19 +23,30 @@ describe('MedReady AI - Core Medical Engines Test Suite', () => {
     expect(ConfidenceEngine.getPriorityCategory(92, 'medium')).toBe('LOW_PRIORITY');
   });
 
-  it('updates topic confidence after assessment', () => {
+  it('starts at 0% baseline and updates topic confidence after assessment', () => {
     const sampleRecord = { ...INITIAL_TOPIC_CONFIDENCE['top-brachial-plexus'] };
-    const originalScore = sampleRecord.confidenceScore;
+    expect(sampleRecord.confidenceScore).toBe(0);
 
     const updated = ConfidenceEngine.recordTopicPracticeResult(sampleRecord, 'Theory', 'YES');
-    expect(updated.confidenceScore).toBeGreaterThan(originalScore);
+    expect(updated.confidenceScore).toBeGreaterThan(0);
     expect(updated.attemptsCount).toBe(sampleRecord.attemptsCount + 1);
   });
 
-  it('detects mastered topics for "Don\'t Study This Now" intervention', () => {
-    const mastered = ConfidenceEngine.getMasteredTopicsToAvoid(INITIAL_TOPIC_CONFIDENCE);
-    expect(mastered.length).toBeGreaterThan(0);
-    expect(mastered[0].confidenceScore).toBeGreaterThanOrEqual(85);
+  it('detects mastered topics for "Don\'t Study This Now" intervention when topics reach >= 85%', () => {
+    // Initial state has 0 mastered topics
+    expect(ConfidenceEngine.getMasteredTopicsToAvoid(INITIAL_TOPIC_CONFIDENCE).length).toBe(0);
+
+    // When student masters a topic
+    const testMap = {
+      ...INITIAL_TOPIC_CONFIDENCE,
+      'top-histology-epithelium': {
+        ...INITIAL_TOPIC_CONFIDENCE['top-histology-epithelium'],
+        confidenceScore: 92,
+      }
+    };
+    const mastered = ConfidenceEngine.getMasteredTopicsToAvoid(testMap);
+    expect(mastered.length).toBe(1);
+    expect(mastered[0].confidenceScore).toBe(92);
   });
 
   it('generates dynamic study plans allocating time smartly', () => {

@@ -19,16 +19,13 @@ export class ConfidenceEngine {
    * Categorizes topic priority based on confidence score and exam relevance
    */
   static getPriorityCategory(confidenceScore: number, importance: 'high' | 'medium' | 'low'): PriorityCategory {
-    if (confidenceScore < 60 && (importance === 'high' || importance === 'medium')) {
+    if (confidenceScore < 60) {
       return 'MUST_STUDY'; // 🔴
     }
-    if (confidenceScore < 75 && importance === 'high') {
+    if (confidenceScore < 80) {
       return 'HIGH_PRIORITY'; // 🟠
     }
-    if (confidenceScore >= 80) {
-      return confidenceScore >= 90 ? 'LOW_PRIORITY' : 'MAINTAIN'; // 🟢 or ⚪
-    }
-    return 'HIGH_PRIORITY';
+    return confidenceScore >= 90 ? 'LOW_PRIORITY' : 'MAINTAIN'; // 🟢 or ⚪
   }
 
   /**
@@ -45,11 +42,11 @@ export class ConfidenceEngine {
       return {
         subjectId,
         subjectName,
-        overallScore: 70,
-        theoryScore: 72,
-        practicalScore: 68,
-        vivaScore: 65,
-        recallScore: 75,
+        overallScore: 0,
+        theoryScore: 0,
+        practicalScore: 0,
+        vivaScore: 0,
+        recallScore: 0,
         weakTopicsCount: 0,
         strongTopicsCount: 0,
       };
@@ -62,7 +59,7 @@ export class ConfidenceEngine {
     const sumViva = relevantTopics.reduce((acc, t) => acc + t.vivaScore, 0);
     const sumRecall = relevantTopics.reduce((acc, t) => acc + t.recallScore, 0);
 
-    const weakCount = relevantTopics.filter(t => t.confidenceScore < 65).length;
+    const weakCount = relevantTopics.filter(t => t.confidenceScore < 60).length;
     const strongCount = relevantTopics.filter(t => t.confidenceScore >= 80).length;
 
     return {
@@ -104,6 +101,15 @@ export class ConfidenceEngine {
 
     const topicsMastered = topics.filter(t => t.confidenceScore >= 80).length;
 
+    // Update today's score in historical array
+    const updatedHistory = [...baseOverview.historicalReadiness];
+    if (updatedHistory.length > 0) {
+      updatedHistory[updatedHistory.length - 1] = {
+        ...updatedHistory[updatedHistory.length - 1],
+        score: avgOverall
+      };
+    }
+
     return {
       ...baseOverview,
       overallReadiness: avgOverall,
@@ -114,6 +120,9 @@ export class ConfidenceEngine {
       hoursUntilExam,
       minutesUntilExam,
       topicsMastered,
+      streakDays: Math.max(1, baseOverview.streakDays),
+      readinessDelta: avgOverall - (baseOverview.historicalReadiness[0]?.score || 0),
+      historicalReadiness: updatedHistory,
     };
   }
 
@@ -125,31 +134,38 @@ export class ConfidenceEngine {
     mode: 'Theory' | 'Practical' | 'Viva' | 'Recall',
     resultGrade: 'YES' | 'PARTIAL' | 'NO' | number // 'YES' / 'PARTIAL' / 'NO' or score 0-10
   ): TopicConfidenceRecord {
-    let delta = 0;
-    if (typeof resultGrade === 'number') {
-      // Score out of 10 -> map to delta
-      delta = Math.round((resultGrade - 5) * 2.5);
-    } else {
-      if (resultGrade === 'YES') delta = +8;
-      else if (resultGrade === 'PARTIAL') delta = +2;
-      else if (resultGrade === 'NO') delta = -6;
-    }
-
     const updated = { ...record };
     updated.attemptsCount += 1;
     updated.lastPracticed = new Date().toISOString();
 
+    const calculateNewComponentScore = (currentScore: number): number => {
+      if (typeof resultGrade === 'number') {
+        const target = Math.round(Math.min(100, Math.max(10, resultGrade * 10)));
+        if (currentScore === 0) return target;
+        return Math.round((currentScore * 0.35) + (target * 0.65));
+      } else {
+        if (resultGrade === 'YES') {
+          return currentScore === 0 ? 75 : Math.min(100, currentScore + 15);
+        } else if (resultGrade === 'PARTIAL') {
+          return currentScore === 0 ? 45 : Math.min(100, currentScore + 8);
+        } else {
+          return currentScore === 0 ? 20 : Math.max(0, currentScore - 6);
+        }
+      }
+    };
+
     if (mode === 'Theory') {
-      updated.theoryScore = Math.min(100, Math.max(10, updated.theoryScore + delta));
+      updated.theoryScore = calculateNewComponentScore(updated.theoryScore);
     } else if (mode === 'Practical') {
-      updated.practicalScore = Math.min(100, Math.max(10, updated.practicalScore + delta));
+      updated.practicalScore = calculateNewComponentScore(updated.practicalScore);
     } else if (mode === 'Viva') {
-      updated.vivaScore = Math.min(100, Math.max(10, updated.vivaScore + delta));
+      updated.vivaScore = calculateNewComponentScore(updated.vivaScore);
     } else if (mode === 'Recall') {
-      updated.recallScore = Math.min(100, Math.max(10, updated.recallScore + delta));
+      updated.recallScore = calculateNewComponentScore(updated.recallScore);
     }
 
-    // Weighted new confidence score
+    // Weighted confidence score
+    // If some components are still 0, we score based on practiced components or full weights
     updated.confidenceScore = Math.round(
       (updated.theoryScore * 0.35) +
       (updated.practicalScore * 0.25) +
@@ -176,3 +192,4 @@ export class ConfidenceEngine {
       .sort((a, b) => b.confidenceScore - a.confidenceScore);
   }
 }
+
